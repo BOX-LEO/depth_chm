@@ -1,0 +1,58 @@
+# RGB2CHM configuration.
+# All `paths.*` values are resolved relative to the repo root (see rgb2chm/config.py).
+# `${paths.x}` tokens are substituted after the rest of the paths block is loaded.
+
+paths:
+  data_root: data/martell
+  outputs_root: outputs
+
+  # --- Stage 1 raw inputs ---
+  input_tif: ${paths.data_root}/orthomosaic.tif
+  input_las: ${paths.data_root}/lidar.las
+  proj_file: ${paths.data_root}/lidar.prj
+
+  # --- Stage 1 tile outputs ---
+  tiles_root: ${paths.data_root}/tiles
+  image_dir:  ${paths.tiles_root}/image
+  lidar_dir:  ${paths.tiles_root}/lidar
+  chm_dir:    ${paths.tiles_root}/chm
+  vanilla_depth_dir: ${paths.tiles_root}/metric_depth  # output of pretrained depth model
+  pseudo_gt_dir: ${paths.tiles_root}/pseudo_gt         # fused vanilla depth + CHM
+
+  # --- Stage 2 outputs ---
+  model_dir:       ${paths.outputs_root}/depth_chm_trained
+  predictions_dir: ${paths.outputs_root}/predictions
+  analysis_dir:    ${paths.outputs_root}/analysis
+
+crop:
+  crop_size: 1000
+  crop_step_size: 500
+  grid_num: 50
+  smooth: true
+  save_image: true
+  save_chm: true
+
+train:
+  pretrained_model: depth-anything/Depth-Anything-V2-Metric-Indoor-Base-hf
+  trainable: full            # full | head
+  gt: pseudo                 # pseudo | chm
+  batch_size: 8
+  val_batch_size: 64
+  max_depth: 40.0
+  min_depth: 1.0e-5
+  l1_weight: 0.1
+  lr_head_multiplier: 10.0
+  n_trials: 10
+  seed: 42
+
+inference:
+  max_depth: 40.0
+  # Each variant corresponds to a trained model dir `${paths.model_dir}_<variant>`
+  # and writes predictions to `${paths.predictions_dir}_<variant>`.
+  variants: [full_pseudo, head_pseudo, full_chm, head_chm]
+
+analysis:
+  eval_target: chm           # chm | pseudo_gt
+  variants: [full_pseudo]    # subfolders under predictions_dir to analyse
+  thresholds: [1, 2, 3]      # %ground thresholds
+  target_sizes: [[50, 50]]   # downsampling target (h, w)

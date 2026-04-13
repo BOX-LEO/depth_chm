@@ -1,0 +1,19 @@
+# Data and model artifacts (configure paths in configs/default.yaml)
+data/
+outputs/
+models/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+CLAUDE.md
