@@ -22,8 +22,8 @@ Outputs: `(image, chm, pseudo_gt)` tile triples.
 ## Setup
 
 ```bash
-conda create -n rgb2chm python=3.10 -y
-conda activate rgb2chm
+conda create -n depth_chm python=3.10 -y
+conda activate depth_chm
 pip install -r requirements.txt
 ```
 
@@ -86,7 +86,7 @@ python scripts/03_pipeline_train.py --test_run
 ```
 RGB2CHM/
 ├── configs/default.yaml            # all paths + hyperparameters
-├── rgb2chm/config.py               # YAML loader (resolves ${paths.*}, anchors at repo root)
+├── depth_chm/config.py             # YAML loader (resolves ${paths.*}, anchors at repo root)
 ├── scripts/
 │   ├── 01_crop_tif_las.py
 │   ├── 02_residual_depth_chm.py

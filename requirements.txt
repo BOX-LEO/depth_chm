@@ -1,4 +1,8 @@
-torch>=2.1
+# For CUDA 12.4 drivers, install torch with the cu124 wheel index:
+#   pip install --index-url https://download.pytorch.org/whl/cu124 torch torchvision
+# Newer torch wheels on PyPI default to CUDA 13 and require driver >= 12.8.
+torch>=2.1,<2.8
+torchvision>=0.16,<0.23
 transformers>=4.40
 optuna>=3.5
 rasterio>=1.3

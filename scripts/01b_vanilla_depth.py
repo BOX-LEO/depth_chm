@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from rgb2chm.config import add_config_arg, load_config
+from depth_chm.config import add_config_arg, load_config
 
 # Reuse the inference implementation from script 04.
 _this_dir = Path(__file__).resolve().parent

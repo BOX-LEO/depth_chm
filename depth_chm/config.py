@@ -1,12 +1,12 @@
 """YAML config loader with `${paths.x}` substitution and repo-root anchoring.
 
 Usage:
-    from rgb2chm.config import load_config
+    from depth_chm.config import load_config
     cfg = load_config("configs/default.yaml")
     print(cfg["paths"]["image_dir"])   # absolute path
 
 All keys under `paths:` are resolved to absolute paths anchored at the repo
-root (the parent of the `rgb2chm/` package), so scripts can be invoked from
+root (the parent of the `depth_chm/` package), so scripts can be invoked from
 any working directory.
 """
 

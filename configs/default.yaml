@@ -1,5 +1,5 @@
 # RGB2CHM configuration.
-# All `paths.*` values are resolved relative to the repo root (see rgb2chm/config.py).
+# All `paths.*` values are resolved relative to the repo root (see depth_chm/config.py).
 # `${paths.x}` tokens are substituted after the rest of the paths block is loaded.
 
 paths:

@@ -20,7 +20,7 @@ from scipy.stats import binned_statistic_2d
 from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from rgb2chm.config import add_config_arg, load_config
+from depth_chm.config import add_config_arg, load_config
 
 
 def get_las_crs(input):

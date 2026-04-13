@@ -12,7 +12,7 @@ from skimage.exposure import match_histograms
 from scipy.ndimage import gaussian_filter, gaussian_gradient_magnitude
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from rgb2chm.config import add_config_arg, load_config
+from depth_chm.config import add_config_arg, load_config
 
 
 def read_tif_height(file_path):

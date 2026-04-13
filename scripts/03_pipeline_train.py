@@ -25,7 +25,7 @@ from tqdm import tqdm
 from transformers import AutoImageProcessor, DepthAnythingForDepthEstimation
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from rgb2chm.config import add_config_arg, load_config
+from depth_chm.config import add_config_arg, load_config
 
 
 # ============== Loss Functions ==============
