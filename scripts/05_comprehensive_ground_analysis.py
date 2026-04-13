@@ -18,10 +18,12 @@ Key Features:
 """
 
 import os
+import sys
 import argparse
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-import rasterio
 import torch
 import torch.nn.functional as F
 from sklearn.metrics import r2_score
@@ -30,22 +32,8 @@ import re
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-def read_tif_height(file_path):
-    """
-    Read TIF file and return height data
-    
-    Args:
-        file_path (str): Path to the TIF file
-        
-    Returns:
-        np.ndarray: Height data as float32 array, vertically flipped
-    """
-    chm = rasterio.open(file_path)
-    chm = chm.read(1)
-    chm = chm.astype(np.float32)
-    # flip vertically to match coordinate system
-    chm = np.flipud(chm)
-    return chm
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from depth_chm.utils import list_tiles, read_tif_height
 
 
 def smart_downsample(height_map, filter_size):
@@ -256,16 +244,16 @@ def analyze_predictions(root_path, pred_root_path, sub_path_list, analysis_dir=N
         pred_path = os.path.join(pred_root_path, s)
 
         # Get all available files
-        chm_files = [f for f in os.listdir(chm_path) if f.endswith('.tif')]
-        pseudo_gt_files = [f for f in os.listdir(pseudo_gt_path) if f.endswith('.npy')]
-        pred_files = [f for f in os.listdir(pred_path) if f.endswith('.npy')]
+        chm_files = list_tiles(chm_path, ('.tif',))
+        pseudo_gt_files = list_tiles(pseudo_gt_path, ('.npy',))
+        pred_files = list_tiles(pred_path, ('.npy',))
 
         print(f"Found {len(chm_files)} CHM files, {len(pseudo_gt_files)} pseudo GT files, {len(pred_files)} prediction files")
 
         # Extract coordinates from filenames
         coordinates_set = set()
-        for filename in chm_files:
-            x, y = extract_coordinates(filename)
+        for filepath in chm_files:
+            x, y = extract_coordinates(os.path.basename(filepath))
             if x is not None and y is not None:
                 coordinates_set.add((x, y))
 

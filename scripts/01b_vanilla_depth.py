@@ -21,7 +21,6 @@ _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)
 run_inference = _mod.run_inference
 
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     add_config_arg(parser)
@@ -35,7 +34,6 @@ def main():
         output_dir=paths['vanilla_depth_dir'],
         max_depth=cfg['inference']['max_depth'],
     )
-
 
 if __name__ == '__main__':
     main()

@@ -186,6 +186,5 @@ def main():
                 progress.update(1)
     progress.close()
 
-
 if __name__ == '__main__':
     main()

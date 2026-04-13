@@ -2,6 +2,8 @@
 data/
 outputs/
 models/
+
+# debug
 tests/
 
 # Python

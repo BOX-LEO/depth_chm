@@ -9,50 +9,45 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from os.path import isdir
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 from PIL import Image
 from tqdm import tqdm
-from transformers import AutoImageProcessor, DepthAnythingForDepthEstimation
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from depth_chm.config import add_config_arg, load_config
+from depth_chm.utils import get_device, list_tiles, load_model_and_processor, resize_prediction
 
 
 def run_inference(model_path, image_dir, output_dir, max_depth=40.0, device=None):
     if device is None:
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device = get_device()
     print(f'Using device: {device}')
     os.makedirs(output_dir, exist_ok=True)
 
     print(f'Loading model from {model_path}...')
-    is_local = isdir(model_path)
-    processor = AutoImageProcessor.from_pretrained(model_path, local_files_only=is_local)
-    model = DepthAnythingForDepthEstimation.from_pretrained(model_path, local_files_only=is_local)
-    model = model.to(device).eval()
+    processor, model = load_model_and_processor(model_path, device=device)
+    model = model.eval()
 
-    image_files = sorted(f for f in os.listdir(image_dir) if f.endswith(('.png', '.jpg', '.jpeg')))
+    image_files = list_tiles(image_dir, ('.png', '.jpg', '.jpeg'))
     print(f'Found {len(image_files)} images')
 
     with torch.no_grad():
-        for image_file in tqdm(image_files, desc='Processing images'):
-            image = Image.open(os.path.join(image_dir, image_file)).convert('RGB')
+        for image_path in tqdm(image_files, desc='Processing images'):
+            image = Image.open(image_path).convert('RGB')
             original_size = image.size  # (w, h)
             inputs = processor(images=image, return_tensors='pt')
             pixel_values = inputs['pixel_values'].to(device)
 
             outputs = model(pixel_values)
             pred_scaled = outputs.predicted_depth * max_depth
-            pred_resized = F.interpolate(
-                pred_scaled.unsqueeze(0),
-                size=(original_size[1], original_size[0]),
-                mode='bilinear', align_corners=True,
-            ).squeeze().cpu().numpy()
+            pred_resized = resize_prediction(
+                pred_scaled.squeeze(0),
+                (original_size[1], original_size[0]),
+            ).cpu().numpy()
 
-            output_name = os.path.splitext(image_file)[0] + '.npy'
+            output_name = os.path.splitext(os.path.basename(image_path))[0] + '.npy'
             np.save(os.path.join(output_dir, output_name), pred_resized.astype(np.float32))
 
     print(f'Inference complete. Results saved to: {output_dir}')

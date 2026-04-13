@@ -6,22 +6,13 @@ import sys
 from pathlib import Path
 import cv2
 import numpy as np
-import rasterio
 from PIL import Image
 from skimage.exposure import match_histograms
 from scipy.ndimage import gaussian_filter, gaussian_gradient_magnitude
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from depth_chm.config import add_config_arg, load_config
-
-
-def read_tif_height(file_path):
-    chm = rasterio.open(file_path)
-    chm = chm.read(1)
-    chm = chm.astype(np.float32)
-    # flip vertically
-    chm = np.flipud(chm)
-    return chm
+from depth_chm.utils import list_tiles, read_tif_height
 
 
 def regularized_depth(org_depth,target_depth):
@@ -69,12 +60,9 @@ def main():
     output_path = paths['pseudo_gt_dir']
     os.makedirs(output_path, exist_ok=True)
 
-    fused_chm_files = sorted(os.path.join(fused_chm_path, f) for f in os.listdir(fused_chm_path)
-                              if f.endswith(('.tif', '.npy')))
-    depth_pred_files = sorted(os.path.join(depth_pred_path, f) for f in os.listdir(depth_pred_path)
-                               if f.endswith('.npy'))
-    image_files = sorted(os.path.join(image_path, f) for f in os.listdir(image_path)
-                          if f.endswith(('.png', '.jpg')))
+    fused_chm_files = list_tiles(fused_chm_path, ('.tif', '.npy'))
+    depth_pred_files = list_tiles(depth_pred_path, ('.npy',))
+    image_files = list_tiles(image_path, ('.png', '.jpg'))
 
     for fused_chm_file, depth_pred_file, image_file in zip(fused_chm_files, depth_pred_files, image_files):
         image = Image.open(image_file)

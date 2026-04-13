@@ -14,7 +14,6 @@ from types import SimpleNamespace
 
 import numpy as np
 import optuna
-import rasterio
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -22,10 +21,16 @@ from PIL import Image
 from torch.optim import AdamW
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
-from transformers import AutoImageProcessor, DepthAnythingForDepthEstimation
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from depth_chm.config import add_config_arg, load_config
+from depth_chm.utils import (
+    get_device,
+    list_tiles,
+    load_model_and_processor,
+    read_tif_height,
+    resize_prediction,
+)
 
 
 # ============== Loss Functions ==============
@@ -83,14 +88,6 @@ class DepthDataset(Dataset):
     def __len__(self):
         return len(self.image_files)
 
-    def read_tif_height(self, file_path):
-        """Read CHM TIF file and return height values"""
-        with rasterio.open(file_path) as src:
-            chm = src.read(1).astype(np.float32)
-        # Flip vertically (as in depth_chm_optimize.py)
-        chm = np.flipud(chm)
-        return chm
-
     def __getitem__(self, idx):
         # Load image
         image = Image.open(self.image_files[idx]).convert('RGB')
@@ -104,7 +101,7 @@ class DepthDataset(Dataset):
             depth = self.max_depth - height
         elif depth_file.endswith('.tif'):
             # CHM: read TIF, normalize, and convert to depth
-            height = self.read_tif_height(depth_file)
+            height = read_tif_height(depth_file)
             # Normalize height (subtract minimum as in depth_chm_optimize.py)
             height = height - height.min()
             depth = self.max_depth - height
@@ -178,12 +175,7 @@ def train_epoch(model, dataloader, optimizer, criterion, device, max_depth, min_
                 return float('inf'), current_iter
 
             # Resize prediction to match target size
-            pred_resized = F.interpolate(
-                pred.unsqueeze(0).unsqueeze(0),
-                size=target.shape,
-                mode='bilinear',
-                align_corners=True
-            ).squeeze()
+            pred_resized = resize_prediction(pred, target.shape)
 
             # Check for NaN/Inf in prediction
             if torch.isnan(pred_resized).any() or torch.isinf(pred_resized).any():
@@ -247,12 +239,7 @@ def validate(model, dataloader, criterion, device, max_depth, min_depth):
                 if not target.min() > 0:
                     return float('inf')
 
-                pred_resized = F.interpolate(
-                    pred.unsqueeze(0).unsqueeze(0),
-                    size=target.shape,
-                    mode='bilinear',
-                    align_corners=True
-                ).squeeze()
+                pred_resized = resize_prediction(pred, target.shape)
 
                 if torch.isnan(pred_resized).any() or torch.isinf(pred_resized).any():
                     return float('inf')
@@ -313,40 +300,27 @@ def main():
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = get_device()
     print(f'Using device: {device}')
 
     # Create output directory
     os.makedirs(args.output_dir, exist_ok=True)
 
-    # Load processor
+    # Load processor (model is loaded fresh per Optuna trial below)
     print(f'Loading model from {args.model_path}...')
-
-    # Check if it's a local path or HuggingFace Hub model
-    if os.path.isdir(args.model_path) or os.path.isdir(os.path.abspath(args.model_path)):
-        model_path = os.path.abspath(args.model_path)
-        is_local = True
-        print(f'Using local model: {model_path}')
-    else:
-        model_path = args.model_path
-        is_local = False
-        print(f'Using HuggingFace Hub model: {model_path}')
-
-    processor = AutoImageProcessor.from_pretrained(model_path, local_files_only=is_local)
+    processor, _ = load_model_and_processor(args.model_path)
+    model_path = args.model_path
 
     # Load dataset
     print('Loading dataset...')
     print(f'Training mode: {args.trainable}, GT type: {args.gt}')
-    image_files = sorted([os.path.join(args.image_dir, f)
-                          for f in os.listdir(args.image_dir) if f.endswith('.png')])
+    image_files = list_tiles(args.image_dir, ('.png',))
 
     # Load depth files based on GT type
     if args.gt == 'pseudo':
-        depth_files = sorted([os.path.join(args.depth_dir, f)
-                              for f in os.listdir(args.depth_dir) if f.endswith('.npy')])
+        depth_files = list_tiles(args.depth_dir, ('.npy',))
     elif args.gt == 'chm':
-        depth_files = sorted([os.path.join(args.depth_dir, f)
-                              for f in os.listdir(args.depth_dir) if f.endswith('.tif')])
+        depth_files = list_tiles(args.depth_dir, ('.tif',))
 
     print(f'Found {len(image_files)} images and {len(depth_files)} depth files')
     assert len(image_files) == len(depth_files), "Number of images and depth files must match"
@@ -376,8 +350,7 @@ def main():
         print('='*60)
 
         # Load model
-        model = DepthAnythingForDepthEstimation.from_pretrained(model_path, local_files_only=is_local)
-        model = model.to(device)
+        _, model = load_model_and_processor(model_path, device=device)
 
         # Set trainable parameters
         if args.trainable == 'head':
@@ -445,12 +418,7 @@ def main():
                 valid_samples = 0
                 for pred, target in zip(predicted_depth, depths):
                     target = target.to(device)
-                    pred_resized = F.interpolate(
-                        pred.unsqueeze(0).unsqueeze(0),
-                        size=target.shape,
-                        mode='bilinear',
-                        align_corners=True
-                    ).squeeze()
+                    pred_resized = resize_prediction(pred, target.shape)
                     pred_scaled = pred_resized * args.max_depth
                     valid_mask = (target >= args.min_depth) & (target <= args.max_depth)
                     if valid_mask.sum() > 0:
@@ -491,12 +459,7 @@ def main():
 
                     for pred, target in zip(predicted_depth, depths):
                         target = target.to(device)
-                        pred_resized = F.interpolate(
-                            pred.unsqueeze(0).unsqueeze(0),
-                            size=target.shape,
-                            mode='bilinear',
-                            align_corners=True
-                        ).squeeze()
+                        pred_resized = resize_prediction(pred, target.shape)
                         pred_scaled = pred_resized * args.max_depth
 
                     gpu_alloc, gpu_res, gpu_max = get_memory_stats()
@@ -542,8 +505,7 @@ def main():
         print(f'\n--- Trial {trial.number}: lr={lr:.2e}, epochs={epochs} ---')
 
         # Load fresh model for each trial
-        model = DepthAnythingForDepthEstimation.from_pretrained(model_path, local_files_only=is_local)
-        model = model.to(device)
+        _, model = load_model_and_processor(model_path, device=device)
 
         # Set trainable parameters based on trainable mode
         if args.trainable == 'head':
@@ -635,8 +597,7 @@ def main():
     print(f'\nTraining final model with best params: lr={best_lr:.2e}, epochs={best_epochs}')
 
     # Load fresh model
-    model = DepthAnythingForDepthEstimation.from_pretrained(model_path, local_files_only=is_local)
-    model = model.to(device)
+    _, model = load_model_and_processor(model_path, device=device)
 
     # Set trainable parameters based on trainable mode
     if args.trainable == 'head':
@@ -699,12 +660,7 @@ def main():
             for pred, target in zip(predicted_depth, depths):
                 target = target.to(device)
 
-                pred_resized = F.interpolate(
-                    pred.unsqueeze(0).unsqueeze(0),
-                    size=target.shape,
-                    mode='bilinear',
-                    align_corners=True
-                ).squeeze()
+                pred_resized = resize_prediction(pred, target.shape)
 
                 pred_scaled = pred_resized * args.max_depth
                 valid_mask = (target >= args.min_depth) & (target <= args.max_depth)

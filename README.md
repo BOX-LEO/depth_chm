@@ -1,8 +1,10 @@
-# RGB2CHM
+# DepthCHM
 
 Predict Canopy Height Models (CHM) from RGB imagery by fine-tuning HuggingFace
 `DepthAnythingForDepthEstimation`, supervised by LiDAR-derived CHM and/or a
 higher-resolution pseudo-GT fused from a vanilla depth model.
+
+Trained model also avilable in [HuggingFace](https://huggingface.co/Boxiang/depth_chm)
 
 ## Pipeline
 
