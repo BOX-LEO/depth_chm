@@ -88,9 +88,13 @@ python scripts/03_pipeline_train.py --test_run
 ```
 RGB2CHM/
 ├── configs/default.yaml            # all paths + hyperparameters
-├── depth_chm/config.py             # YAML loader (resolves ${paths.*}, anchors at repo root)
+├── depth_chm/
+│   ├── config.py                   # YAML loader (resolves ${paths.*}, anchors at repo root)
+│   └── utils.py                    # shared helpers: read_tif_height, get_device,
+│                                   # load_model_and_processor, resize_prediction, list_tiles
 ├── scripts/
 │   ├── 01_crop_tif_las.py
+│   ├── 01b_vanilla_depth.py
 │   ├── 02_residual_depth_chm.py
 │   ├── 03_pipeline_train.py
 │   ├── 04_pipeline_inference.py
